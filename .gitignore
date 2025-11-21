@@ -210,11 +210,12 @@ __marimo__/
 *.pth
 *.pt
 *.pkl
+*.ckpt
 
 # Não commitar resutados do train:
 train*detections.json
 
-
+*:Zone.Identifier
 
 
 

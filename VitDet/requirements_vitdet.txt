@@ -1,0 +1,11 @@
+torch
+torchvision
+--extra-index-url https://download.pytorch.org/whl/cu121
+#git clone https://github.com/facebookresearch/detectron2.git sudo apt update      sudo apt install gcc-10 g++-10 export CC=/usr/bin/gcc-10  export #CXX=/usr/bin/g++-10
+pytorch_lightning
+pycocotools
+matplotlib
+tqdm
+pillow
+ipykernel
+timm

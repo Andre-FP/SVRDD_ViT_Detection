@@ -2,9 +2,9 @@
 set -e
 
 # === CONFIGURAÇÕES ===
-MODEL_NAME="deformable"
+MODEL_NAME="yolov11"
 PYTHON_VERSION="3.11"
-CUDA_VERSION="cu129"
+CUDA_VERSION="cu128"
 
 
 

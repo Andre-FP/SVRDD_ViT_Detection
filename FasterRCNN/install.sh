@@ -23,6 +23,6 @@ conda run -n $MODEL_NAME pip install -r requirements_$MODEL_NAME.txt
 echo ">>> Registrando kernel Jupyter..."
 conda run -n $MODEL_NAME python -m ipykernel install --user \
     --name=$MODEL_NAME \
-    --display-name="VitDet ($MODEL_NAME)"
+    --display-name="$MODEL_NAME (conda)"
 
 echo ">>> Ambiente $MODEL_NAME instalado com sucesso!"

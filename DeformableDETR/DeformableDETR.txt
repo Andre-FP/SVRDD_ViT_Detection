@@ -1,0 +1,10 @@
+DeformableDETR:
+EarlyStop
+	Testando treinando a cabeça com lr=1e-4 e backbone com lr=1e-5
+	batch_size=8
+	
+	Opções a serem consideradas:
+		- Treinar com imagens grandes: 1024x1024 (dados originais)
+		- Treinar só a cabeça.
+		- Treinar a cabeça primeiro com 10 a 20 épocas, e depois a backbone
+  

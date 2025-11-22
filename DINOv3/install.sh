@@ -2,9 +2,11 @@
 set -e
 
 # === CONFIGURAÇÕES ===
-MODEL_NAME="fasterrcnn"
+MODEL_NAME="dinov3"
 PYTHON_VERSION="3.11"
 CUDA_VERSION="cu126"
+
+
 
 if conda env list | grep -q "^$MODEL_NAME "; then
     echo ">>> Ambiente '$MODEL_NAME' já existe. Pulando criação."

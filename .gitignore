@@ -211,6 +211,7 @@ __marimo__/
 *.pt
 *.pkl
 *.ckpt
+*.safetensors
 
 *:Zone.Identifier
 

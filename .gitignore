@@ -212,9 +212,6 @@ __marimo__/
 *.pkl
 *.ckpt
 
-# Não commitar resutados do train:
-train*detections.json
-
 *:Zone.Identifier
 
 

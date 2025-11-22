@@ -8,4 +8,5 @@ tqdm
 pillow
 ipykernel
 timm
+pandas
 ultralytics

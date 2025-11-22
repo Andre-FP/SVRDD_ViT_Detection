@@ -9,4 +9,5 @@ pillow
 ipykernel
 #'numpy<2'
 timm
+pandas
 transformers

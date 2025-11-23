@@ -10,3 +10,4 @@ ipykernel
 timm
 pandas
 ultralytics
+openpyxl

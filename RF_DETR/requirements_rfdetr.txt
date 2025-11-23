@@ -10,3 +10,4 @@ pillow
 ipykernel
 timm
 pandas
+openpyxl

@@ -11,3 +11,4 @@ ipykernel
 timm
 pandas
 transformers
+openpyxl

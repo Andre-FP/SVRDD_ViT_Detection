@@ -1,0 +1,3 @@
+lr: 0.005
+num_classes: 7
+weights: DEFAULT

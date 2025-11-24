@@ -1,0 +1,2 @@
+epoch,step,train_cardinality_error,train_loss_bbox,train_loss_ce,train_loss_giou,training_loss
+0,99,277.875,0.1357872635126114,0.764369010925293,0.784602701663971,3.0125107765197754

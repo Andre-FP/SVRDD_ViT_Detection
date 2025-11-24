@@ -12,3 +12,6 @@ timm
 pandas
 transformers
 openpyxl
+scipy
+tensorboard
+openpyxl

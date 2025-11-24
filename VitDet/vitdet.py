@@ -1,3 +1,4 @@
+import os
 import torch
 import pytorch_lightning as pl
 from detectron2.config import LazyConfig, instantiate
@@ -6,15 +7,17 @@ from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.solver import build_optimizer
 from detectron2.utils.events import EventStorage
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, EarlyStopping
-
-
+from pytorch_lightning.loggers import TensorBoardLogger
 import torch.nn as nn
 
 # ---------- Paths e LazyConfig ----------
-CONFIG_FILE = "./detectron2/projects/ViTDet/configs/COCO/mask_rcnn_vitdet_l_100ep.py"
-PRETRAINED = './output_vitdet/model_final_6146ed.pkl'
+CONFIG_FILE = "./detectron2/projects/ViTDet/configs/COCO/mask_rcnn_vitdet_b_100ep.py"
+PRETRAINED = './output_vitdet/model_final_b.pkl'
+#CONFIG_FILE = "./detectron2/projects/ViTDet/configs/COCO/mask_rcnn_vitdet_l_100ep.py"
+#PRETRAINED = './output_vitdet/model_final_6146ed.pkl'
 ROOT = "/workspace/SVRDD_COCO"
 EPOCHS = 50
+OUTPUT_DIR = "./outputs/vitdet"
 
 register_coco_instances("asphalt_train",  {}, f"{ROOT}/train/_annotations.coco.json", f"{ROOT}/train")
 register_coco_instances("asphalt_val",    {}, f"{ROOT}/valid/_annotations.coco.json", f"{ROOT}/valid")
@@ -49,12 +52,13 @@ cfg.dataloader.evaluator.mapper = {
 }
 
 cfg.train.init_checkpoint = PRETRAINED
-cfg.train.output_dir = "./outputs/vitdet"
+cfg.train.output_dir = OUTPUT_DIR
 cfg.dataloader.train.total_batch_size = 1
 cfg.dataloader.train.num_workers = 4
 cfg.model.roi_heads.num_classes = 7
-cfg.optimizer.lr = 1e-4
+cfg.optimizer.lr = 1e-5
 
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -71,7 +75,7 @@ def _set_bn_eval(module):
             m.eval()
 
 class LitDetect(pl.LightningModule):
-    def __init__(self, model, optimizer_cfg):
+    def __init__(self, model, optimizer_cfg, train_loader, val_loader):
         super().__init__()
         
         self.model = model
@@ -79,6 +83,15 @@ class LitDetect(pl.LightningModule):
         # we won't save optimizer in state dict here; lightning will re-create it in configure_optimizers
         self._optimizer_cfg = optimizer_cfg
 
+        self._train_loader = train_loader
+        self._val_loader = val_loader
+
+    def train_dataloader(self):
+        return self._train_loader
+
+    def val_dataloader(self):
+        return self._val_loader
+    
     def forward(self, batch):
         # not used for training, but keep it
         return self.model(batch)
@@ -91,8 +104,24 @@ class LitDetect(pl.LightningModule):
         # log each loss
         for k, v in loss_dict.items():
             # v may be scalar tensor
-            self.log(f"train/{k}", v.item(), on_step=True, on_epoch=True, prog_bar=False, sync_dist=True, batch_size=len(batch))
-        self.log("train/loss", losses.item(), on_step=True, on_epoch=True, prog_bar=True, sync_dist=True, batch_size=len(batch))
+            self.log(
+                f"train_{k}", 
+                v.item(),
+                on_step=True, 
+                on_epoch=True, 
+                prog_bar=True, 
+                sync_dist=True, 
+                batch_size=len(batch)
+            )
+        self.log(
+            "train_loss", 
+            losses.item(), 
+            on_step=True, 
+            on_epoch=True, 
+            prog_bar=True, 
+            sync_dist=True, 
+            batch_size=len(batch)
+        )
         return losses
 
     def validation_step(self, batch, batch_idx):
@@ -129,8 +158,8 @@ class LitDetect(pl.LightningModule):
         losses = sum(v for v in loss_dict.values())
         # log individual losses e agregado
         for k, v in loss_dict.items():
-            self.log(f"val/{k}", v.item(), on_step=False, on_epoch=True, sync_dist=True, batch_size=len(batch))
-        self.log("val_loss", losses.item(), on_step=False, on_epoch=True, sync_dist=True, batch_size=len(batch))
+            self.log(f"val/{k}", v.item(), on_step=False, on_epoch=True, sync_dist=True, batch_size=len(batch), prog_bar=True)
+        self.log("val_loss", losses.item(), on_step=False, on_epoch=True, sync_dist=True, batch_size=len(batch), prog_bar=True)
 
         return {"val_loss": losses}
 
@@ -167,6 +196,8 @@ class LitDetect(pl.LightningModule):
         )
         return optimizer
 
+        
+    
 # ---------- Instancia Lightning e Trainer ----------
 print("Instantiating model...")
 model = instantiate(cfg.model)
@@ -186,39 +217,47 @@ if cfg.train.init_checkpoint:
     checkpointer.load(cfg.train.init_checkpoint)
 
 print("Loading Model Lightning...")
-lit_model = LitDetect(model=model, optimizer_cfg=cfg.optimizer)
+lit_model = LitDetect(model=model, optimizer_cfg=cfg.optimizer, train_loader=train_loader, val_loader=val_loader)
 
 # load pretrained weights via detectron2 checkpointer
 ckpt = ModelCheckpoint(
     dirpath=cfg.train.output_dir, 
     monitor="val_loss", 
     mode="min", 
-    save_top_k=1, 
+    save_top_k=1,
+    save_last=True,
     filename="best-{epoch:02d}-{val_loss:.2f}"
 )
 
 early_stop = EarlyStopping(
     monitor="val_loss",
     mode="min",
-    patience=5,          # para após 5 épocas sem melhora
+    patience=15,          # para após 5 épocas sem melhora
     min_delta=0.0,
 )
 
 lr_mon = LearningRateMonitor(logging_interval="step")
 
+tb_logger = TensorBoardLogger("tb_logs", name="vitdet")
+
 print("Training...")
-pl_trainer = pl.Trainer(accelerator="gpu" if torch.cuda.is_available() else "cpu",
-                        devices=1,
-                        max_epochs=EPOCHS,
-                        precision=16,
-                        callbacks=[ckpt, lr_mon, early_stop],
-                        accumulate_grad_batches=1,
-                        log_every_n_steps=200)
+pl_trainer = pl.Trainer(
+    accelerator="gpu" if torch.cuda.is_available() else "cpu",
+    devices=1,
+    max_epochs=EPOCHS,
+    precision=16,
+    callbacks=[ckpt, lr_mon, early_stop],
+    accumulate_grad_batches=1,
+    log_every_n_steps=200,
+    logger=tb_logger,
+    limit_train_batches=6000//cfg.dataloader.train.total_batch_size, 
+    limit_val_batches=1000//cfg.dataloader.train.total_batch_size,  
+)
 
-pl_trainer.fit(lit_model, train_loader, val_loader)
-checkpointer.save("model_vitdet_full")
+pl_trainer.fit(lit_model)
+checkpointer.save("model_vitdet_full_2")
 
-def save_detectron2_pickle(model, path="model_final.pkl"):
+def save_detectron2_pickle(model, path="output_vitdet/vitdet_finetuned.pkl"):
     data = {
         "model": model.state_dict(),
         "__author__": "detectron2",
@@ -227,4 +266,4 @@ def save_detectron2_pickle(model, path="model_final.pkl"):
     torch.save(data, path)
     print(f"Saved to {path}")
 
-save_detectron2_pickle(model, path="model_vitdet_full.pkl")
+save_detectron2_pickle(model, path="model_vitdet_full_2.pkl")
